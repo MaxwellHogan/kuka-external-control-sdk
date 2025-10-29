@@ -1,3 +1,8 @@
+I created this fork to add support of an external axis (a linear rail), this has been tested on my setup:
+
+KR50 R2100
+KL 4000
+
 # KUKA External Control SDK
 
 This guide will help you understand how to use the SDK to control your robot externally. You'll find information on the SDK's structure and setup instructions tailored to different systems.
