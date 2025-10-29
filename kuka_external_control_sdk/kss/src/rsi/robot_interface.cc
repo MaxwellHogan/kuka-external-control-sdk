@@ -15,13 +15,21 @@
 #include "kuka/external-control-sdk/kss/rsi/robot_interface.h"
 #include <cmath>
 
+#include <iostream>
+
+#include <tinyxml2.h> // for parsing xml files 
+using namespace tinyxml2;
+
+
 namespace kuka::external::control::kss::rsi {
 
 Robot::Robot(Configuration config)
     : config_(config),
-      last_motion_state_(config.dof, config.gpio_state_configs),
-      initial_motion_state_(config.dof, config.gpio_state_configs),
-      control_signal_(config.dof, config.gpio_command_configs) {}
+    joint_info_(LoadJointsFromRSIConfig("/mnt/nova_ssd/workspaces/isaac_ros-dev/src/kuka-external-control-sdk/kuka_external_control_sdk/krc_setup/kss/Config/User/Common/SensorInterface/rsi_ethernet.xml")),
+    last_motion_state_(config.dof, config.gpio_state_configs, &joint_info_),
+    initial_motion_state_(config.dof, config.gpio_state_configs, &joint_info_),
+    control_signal_(config.dof, config.gpio_command_configs, &joint_info_) {}
+
 
 Status Robot::Setup() {
   if (!endpoint_.Setup(config_.client_port)) {
@@ -107,6 +115,8 @@ Status Robot::SendControlSignal() {
 
 Status
 Robot::ReceiveMotionState(std::chrono::milliseconds receive_request_timeout) {
+
+  // std::cout << "!!!!!!!!!!!! Here at line 113 robot interface !!!!!!!!!!!!";
   if (!endpoint_.ReceiveOrTimeout(receive_request_timeout)) {
     return {ReturnCode::ERROR, "Receiving RSI state failed"};
   }

@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "kuka/external-control-sdk/kss/message_builder.h"
+#include <tinyxml2.h> // for parsing xml files 
+#include <iostream>
 
 #include <chrono>
 #include <cmath>
@@ -20,200 +22,158 @@
 #include <stdexcept>
 #include <string>
 
+#include <fstream>   // Add at the top of the file
+
+using namespace tinyxml2;
+
+
+std::vector<JointInfo> LoadJointsFromRSIConfig(const std::string& filename) {
+    std::vector<JointInfo> joints;
+    tinyxml2::XMLDocument doc;
+    if (doc.LoadFile(filename.c_str()) != tinyxml2::XML_SUCCESS) return joints;
+    tinyxml2::XMLElement* root = doc.FirstChildElement("ROOT");
+    if (!root) return joints;
+    tinyxml2::XMLElement* receive = root->FirstChildElement("RECEIVE");
+    if (!receive) return joints;
+    tinyxml2::XMLElement* elements = receive->FirstChildElement("ELEMENTS");
+    if (!elements) return joints;
+
+    for (tinyxml2::XMLElement* elem = elements->FirstChildElement("ELEMENT");
+         elem; elem = elem->NextSiblingElement("ELEMENT")) {
+        const char* tag = elem->Attribute("TAG");
+        const char* type = elem->Attribute("TYPE");
+        int index = elem->IntAttribute("INDX", 0);
+        // Accept both AK.A and AK.E (rotary and external/linear axes)
+        if (tag && type && (std::string(tag).rfind("AK.A", 0) == 0 || std::string(tag).rfind("AK.E", 0) == 0)) {
+            std::string tagstr(tag);
+            bool is_linear = (tagstr.find("E") != std::string::npos);
+            JointInfo joint{tagstr.substr(tagstr.find('.')+1), tag, type, index, is_linear};
+            joints.push_back(joint);
+        }
+    }
+    return joints;
+}
+
 namespace kuka::external::control::kss {
 
+uint8_t MotionState::file_saved = 0;
+
+
 void MotionState::CreateFromXML(const char *incoming_xml) {
-  if (incoming_xml == nullptr) {
-    throw std::invalid_argument("Received XML can not be null");
-  }
+    if (!incoming_xml) throw std::invalid_argument("Received XML is null");
 
-  int len = strlen(incoming_xml);
-  std::size_t next_value_idx = first_cartesian_position_index_;
-  for (int i = 0; i < kCartesianPositionAttributePrefixes.size(); ++i) {
-    std::size_t dbl_length = 0;
-    next_value_idx += kCartesianPositionAttributePrefixes[i].length() + 1;
-    if (next_value_idx < len) {
-      measured_cartesian_positions_[i] =
-          std::stod(&incoming_xml[next_value_idx], &dbl_length);
-      if (i > 2) {
-        measured_cartesian_positions_[i] *= (M_PI / 180);
-      }
-    } else {
-      throw std::invalid_argument(
-          "Received XML is not valid for the given degree of freedom");
+    // Optional: Save received XML once for debugging
+    if (file_saved == 0){
+        std::ofstream xml_out("/mnt/nova_ssd/workspaces/isaac_ros-dev/received_motionstate.xml", std::ios::out | std::ios::trunc);
+        if (xml_out.is_open()) {
+            xml_out << incoming_xml;
+            xml_out.close();
+        }
+        file_saved = 1;
     }
-    next_value_idx += dbl_length;
-  }
 
-  next_value_idx += kAttributeSuffix.length();
-  // this -1 is to account for that there is no " before the fist attribute
-  next_value_idx += kJointPositionsPrefix.length() - 1;
+    using namespace tinyxml2;
+    XMLDocument doc;
+    if (doc.Parse(incoming_xml) != XML_SUCCESS)
+        throw std::runtime_error("Failed to parse XML");
 
-  for (int i = 0; i < dof_; ++i) {
-    std::size_t dbl_length = 0;
-    next_value_idx += std::floor(std::log10(
-        i + 1.0));       // length of extra digits, e.g. for more than 10 dofs
-    next_value_idx += 6; // length of prefix + 1, e.g. " A1=\""
+    // Top-level <Rob>
+    XMLElement* robElem = doc.FirstChildElement("Rob");
+    if (!robElem) throw std::runtime_error("No <Rob> element");
 
-    if (next_value_idx < len) {
-      measured_positions_[i] =
-          std::stod(&incoming_xml[next_value_idx], &dbl_length) * (M_PI / 180);
-    } else {
-      throw std::invalid_argument(
-          "Received XML is not valid for the given degree of freedom");
+    // --- 1. Cartesian positions <RIst .../> ---
+    XMLElement* ristElem = robElem->FirstChildElement("RIst");
+    if (!ristElem) throw std::runtime_error("No <RIst> element");
+    static const char* cartesianNames[6] = {"X", "Y", "Z", "A", "B", "C"};
+    for (int i = 0; i < 6; ++i) {
+        double val = std::numeric_limits<double>::quiet_NaN();
+        XMLError err = ristElem->QueryDoubleAttribute(cartesianNames[i], &val);
+        if (err != XML_SUCCESS)
+            throw std::runtime_error(std::string("Missing or invalid attribute in <RIst>: ") + cartesianNames[i]);
+        // For A, B, C (indices 3,4,5): convert deg->rad
+        if (i > 2) val *= (M_PI / 180.0);
+        measured_cartesian_positions_[i] = val;
     }
-    next_value_idx += dbl_length; // length of the parsed double
-  }
-  next_value_idx += kAttributeSuffix.length();
-  next_value_idx += kDelayNodePrefix.length();
 
-  if (next_value_idx >= len) {
-    throw std::invalid_argument("Received XML is not valid for the given "
-                                "degree of freedom, Delay node is missing");
-  }
+    // --- 2. Joint positions <AIPos .../> ---
+    XMLElement* aiPosElem = robElem->FirstChildElement("AIPos");
+    XMLElement* eiPosElem = robElem->FirstChildElement("EIPos");
+    if (!aiPosElem) throw std::runtime_error("No <AIPos> element");
+    if (!eiPosElem) throw std::runtime_error("No <EIPos> element");
 
-  char *endptr = nullptr;
-  delay_ = std::strtol(&incoming_xml[next_value_idx], &endptr, 0);
-  if (errno != 0 && endptr == nullptr) {
-    throw std::invalid_argument(
-        "Received XML is not valid for the given degree of freedom, Delay "
-        "value is not a valid number");
-  }
-
-  next_value_idx += endptr - &incoming_xml[next_value_idx];
-  next_value_idx += kAttributeSuffix.length();
-  if (!gpioAttributePrefix.empty()) {
-    next_value_idx += kGpioPrefix.length() - 1;
-  }
-
-  for (int i = 0; i < gpioAttributePrefix.size(); ++i) {
-
-    std::size_t dbl_length = 0;
-    next_value_idx += gpioAttributePrefix[i].length() + 1;
-    if (next_value_idx < len) {
-      measured_gpio_values_[i]->SetValue(
-          std::stod(&incoming_xml[next_value_idx], &dbl_length));
-    } else {
-      throw std::invalid_argument(
-          "Received XML is not valid for the given GPIO configuration");
+    for (size_t i = 0; i < joint_info_->size(); ++i) {
+        const auto& joint = (*joint_info_)[i];
+        double jointValue = std::numeric_limits<double>::quiet_NaN();
+        if (joint.is_linear) {
+            // External axis from EIPos, convert mm to m
+            if (eiPosElem->QueryDoubleAttribute(joint.name.c_str(), &jointValue) != XML_SUCCESS)
+                throw std::runtime_error("Missing EIPos joint attribute: " + joint.name);
+            measured_positions_[i] = jointValue / 1000.0;
+        } else {
+            // Rotary axis from AIPos, convert deg to rad
+            if (aiPosElem->QueryDoubleAttribute(joint.name.c_str(), &jointValue) != XML_SUCCESS)
+                throw std::runtime_error("Missing AIPos joint attribute: " + joint.name);
+            measured_positions_[i] = jointValue * (M_PI / 180.0);
+        }
     }
-    next_value_idx += dbl_length; // length of the parsed double
-  }
-  if (!gpioAttributePrefix.empty()) {
-    next_value_idx += kAttributeSuffix.length();
-  }
-  next_value_idx += kIpocNodePrefix.length();
 
-  if (next_value_idx >= len) {
-    throw std::invalid_argument("Received XML is not valid for the given "
-                                "degree of freedom, IPOC node is missing");
-  }
 
-  ipoc_ = std::strtol(&incoming_xml[next_value_idx], &endptr, 0);
-  if (errno != 0 && endptr == &incoming_xml[next_value_idx]) {
-    throw std::invalid_argument(
-        "Received XML is not valid for the given degree of freedom, IPOC value "
-        "is not a valid number");
-  }
+    // --- 4. IPOC <IPOC>value</IPOC> ---
+    XMLElement* ipocElem = robElem->FirstChildElement("IPOC");
+    ipoc_ = 0;
+    if (ipocElem && ipocElem->GetText())
+        ipoc_ = std::stol(ipocElem->GetText());
 
-  has_positions_ = true;
-  has_cartesian_positions_ = true;
-};
+    // --- Mark state as valid ---
+    has_positions_ = true;
+    has_cartesian_positions_ = true;
+}
 
 void ControlSignal::AppendToXMLString(std::string_view str) {
   strncat(xml_string_, str.data(),
           kBufferSize - strnlen(xml_string_, kBufferSize) - 1);
 }
 
-std::optional<std::string_view>
-ControlSignal::CreateXMLString(int last_ipoc, bool stop_control) {
-  std::memset(xml_string_, 0, sizeof(xml_string_));
+std::optional<std::string_view> ControlSignal::CreateXMLString(int last_ipoc, bool stop_control) {
+    static std::string xml_output; // buffer that will be returned as a view
 
-  AppendToXMLString(kMessagePrefix);
-  AppendToXMLString(kJointPositionsPrefix);
-  for (int i = 0; i < dof_; ++i) {
-    char double_buffer[kPrecision + 3 + 1 + 1 +
-                       1]; // Precision + Digits + Comma + Null + Minus sign
-    AppendToXMLString(joint_position_attribute_prefixes_[i]);
-    int ret = std::snprintf(
-        double_buffer, sizeof(double_buffer), kDoubleAttributeFormat.data(),
-        (joint_position_values_[i] - initial_positions_[i]) * (180 / M_PI));
-    if (ret <= 0) {
-      return std::nullopt;
-    }
+    XMLDocument doc;
+    // <Sen Type="MAXWELL">
+    XMLElement* senElem = doc.NewElement("Sen");
+    senElem->SetAttribute("Type", "MAXWELL");
+    doc.InsertFirstChild(senElem);
 
-    AppendToXMLString(double_buffer);
-    AppendToXMLString("\"");
-  }
-
-  AppendToXMLString(kAttributeSuffix);
-  AppendToXMLString(kStopNodePrefix);
-  AppendToXMLString(stop_control ? "1" : "0");
-  AppendToXMLString(kStopNodeSuffix);
-  if (!gpioAttributePrefix.empty()) {
-    AppendToXMLString(kGpioPrefix);
-  }
-  for (size_t i = 0; i < gpioAttributePrefix.size(); i++) {
-    AppendToXMLString(gpioAttributePrefix[i]);
-    switch (gpio_values_[i]->GetGPIOConfig()->GetValueType()) {
-    case GPIOValueType::BOOL: {
-      // Append bool value
-      auto value = gpio_values_[i]->GetBoolValue();
-      if (value.has_value()) {
-        AppendToXMLString(value.value() ? "1" : "0");
-      } else {
-        return std::nullopt;
-      }
-      break;
-    }
-    case GPIOValueType::DOUBLE: {
-      // Append double value
-      char double_buffer[kPrecision + 19 + 1 + 1 +
-                         1]; // Precision + Digits + Comma + Null + Minus sign
-      auto value = gpio_values_[i]->GetDoubleValue();
-      if (value.has_value()) {
-        int ret = std::snprintf(double_buffer, sizeof(double_buffer),
-                                kDoubleAttributeFormat.data(), value.value());
-        if (ret <= 0) {
-          return std::nullopt;
+    // <AK .../> for joint positions
+    XMLElement* akElem = doc.NewElement("AK");
+    for (size_t i = 0; i <  joint_info_->size(); ++i) {
+        const auto& joint = (*joint_info_)[i];
+        double correction = joint_position_values_[i] - initial_positions_[i];
+        if (joint.is_linear) {
+            double correction_mm = correction * 1000.0; // meters -> mm
+            akElem->SetAttribute(joint.name.c_str(), correction_mm);
+        } else {
+            double correction_deg = correction * (180.0 / M_PI);
+            akElem->SetAttribute(joint.name.c_str(), correction_deg);
         }
-        AppendToXMLString(double_buffer);
-      } else {
-        return std::nullopt;
-      }
-      break;
     }
-    case GPIOValueType::LONG: {
-      // Append double value
-      char long_buffer[19 + 1 + 1]; // Digits + Null + Minus sign
-      auto value = gpio_values_[i]->GetLongValue();
-      if (value.has_value()) {
-        int ret = std::snprintf(long_buffer, sizeof(long_buffer), "%ld",
-                                value.value());
-        if (ret <= 0) {
-          return std::nullopt;
-        }
-        AppendToXMLString(long_buffer);
-      } else {
-        return std::nullopt;
-      }
-      break;
-    }
-    default:
-      return std::nullopt;
-      break;
-    }
-    AppendToXMLString("\"");
-  }
-  if (!gpioAttributePrefix.empty()) {
-    AppendToXMLString(kAttributeSuffix);
-  }
-  AppendToXMLString(kIpocNodePrefix);
-  AppendToXMLString(std::to_string(last_ipoc).data());
-  AppendToXMLString(kIpocNodeSuffix);
-  AppendToXMLString(kMessageSuffix);
+    senElem->InsertEndChild(akElem);
 
-  return xml_string_;
+    // <Stop>...</Stop>
+    XMLElement* stopElem = doc.NewElement("Stop");
+    stopElem->SetText(stop_control ? "1" : "0");
+    senElem->InsertEndChild(stopElem);
+
+    // <IPOC>...</IPOC>
+    XMLElement* ipocElem = doc.NewElement("IPOC");
+    ipocElem->SetText(std::to_string(last_ipoc).c_str());
+    senElem->InsertEndChild(ipocElem);
+
+    // Convert to string
+    XMLPrinter printer;
+    doc.Print(&printer);
+
+    xml_output = printer.CStr();
+    return xml_output;
 }
 
 void ControlSignal::SetInitialPositions(const MotionState &initial_positions) {

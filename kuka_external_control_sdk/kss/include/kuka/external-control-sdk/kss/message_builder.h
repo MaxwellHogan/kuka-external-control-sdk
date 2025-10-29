@@ -25,12 +25,26 @@
 #include "kuka/external-control-sdk/common/message_builder.h"
 #include "kuka/external-control-sdk/kss/gpio_value.h"
 
+// NOTE: I only support linear or rotary 
+struct JointInfo {
+    std::string name;   // e.g., "A1"
+    std::string tag;    // e.g., "AK.A1"
+    std::string type;   // e.g., "DOUBLE"
+    int index;          // e.g., 1
+    bool is_linear;     // determine if rotary or linear 
+};
+
+std::vector<JointInfo> LoadJointsFromRSIConfig(const std::string& filename);
+
 namespace kuka::external::control::kss {
 
 class MotionState : public BaseMotionState {
 public:
-  MotionState(std::size_t dof, std::vector<GPIOConfiguration> gpio_config_list)
-      : BaseMotionState(dof) {
+  static uint8_t file_saved; // set to 1 when first xml arrives
+
+  MotionState(std::size_t dof, std::vector<GPIOConfiguration> gpio_config_list, const std::vector<JointInfo>* joint_info)
+      : BaseMotionState(dof), joint_info_(joint_info) {
+
     measured_positions_.resize(dof, std::numeric_limits<double>::quiet_NaN());
     measured_torques_.resize(dof, std::numeric_limits<double>::quiet_NaN());
     measured_velocities_.resize(dof, std::numeric_limits<double>::quiet_NaN());
@@ -55,6 +69,9 @@ public:
   int GetDelay() { return delay_; }
 
 private:
+
+  const std::vector<JointInfo>* joint_info_;
+
   const std::string kMessagePrefix = "<Rob Type=\"KUKA\">";
 
   const std::string kCartesianPositionsPrefix = "<RIst";
@@ -82,9 +99,9 @@ private:
 
 class ControlSignal : public BaseControlSignal {
 public:
-  ControlSignal(std::size_t dof,
-                std::vector<GPIOConfiguration> gpio_config_list)
-      : BaseControlSignal(dof) {
+  ControlSignal(std::size_t dof, std::vector<GPIOConfiguration> gpio_config_list, const std::vector<JointInfo>* joint_info)
+      : BaseControlSignal(dof), joint_info_(joint_info) {
+
     joint_position_values_.resize(dof, 0.0);
     initial_positions_.resize(dof, 0.0);
     cartesian_position_values_.resize(6, 0.0);
@@ -113,9 +130,10 @@ public:
   void Reset() { has_initial_positions_ = false; }
 
 private:
+  const std::vector<JointInfo>* joint_info_;
   void AppendToXMLString(std::string_view str);
 
-  const std::string kMessagePrefix = "<Sen Type=\"KROSHU\">";
+  const std::string kMessagePrefix = "<Sen Type=\"MAXWELL\">";
   const std::string kJointPositionsPrefix = "<AK";
   std::vector<std::string> joint_position_attribute_prefixes_;
   const std::string kDoubleAttributeFormat =

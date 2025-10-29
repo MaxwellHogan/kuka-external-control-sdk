@@ -19,6 +19,9 @@
 #include "kuka/external-control-sdk/utils/os-core-udp-communication/secure_socket.h"
 #include "proto-api/motion-services-ecs/control_signal_external.pb.h"
 
+#include <string>
+#include <iostream>
+
 using namespace std::chrono_literals;
 using namespace kuka::external::control;
 
@@ -32,6 +35,7 @@ Robot::Robot(Configuration config)
   config_.certificate_path = config.certificate_path;
   config_.private_key_path = config.private_key_path;
   config_.dof = config.dof;
+  std::cout << "######## DOF" << config.dof << "####################";
   config_.monitoring_timeout = config.monitoring_timeout;
   config_.connection_timeout = config.connection_timeout;
 

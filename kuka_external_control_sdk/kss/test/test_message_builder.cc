@@ -278,7 +278,7 @@ TEST_F(KSSControlSignal, TestZeroInit6Dof) {
     kuka::external::control::kss::ControlSignal control_signal(6, initial_motion_state);
 
     const char* expected_xml =
-      "<Sen Type=\"KROSHU\"><AK A1=\"0.000000\" A2=\"0.000000\" A3=\"0.000000\" A4=\"0.000000\" A5=\"0.000000\" A6=\"0.000000\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
+      "<Sen Type=\"MAXWELL\"><AK A1=\"0.000000\" A2=\"0.000000\" A3=\"0.000000\" A4=\"0.000000\" A5=\"0.000000\" A6=\"0.000000\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
 
     EXPECT_STREQ(control_signal.CreateXMLString(0).value().data(), expected_xml);
 }
@@ -290,7 +290,7 @@ TEST_F(KSSControlSignal, TestZeroInit4Dof) {
     kuka::external::control::kss::ControlSignal control_signal(4, initial_motion_state);
 
     const char* expected_xml =
-      "<Sen Type=\"KROSHU\"><AK A1=\"0.000000\" A2=\"0.000000\" A3=\"0.000000\" A4=\"0.000000\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
+      "<Sen Type=\"MAXWELL\"><AK A1=\"0.000000\" A2=\"0.000000\" A3=\"0.000000\" A4=\"0.000000\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
 
     EXPECT_STREQ(control_signal.CreateXMLString(0).value().data(), expected_xml);
 }
@@ -303,7 +303,7 @@ TEST_F(KSSControlSignal, TestZeroInit0Dof) {
     kuka::external::control::kss::ControlSignal control_signal(0, initial_motion_state);
 
     const char* expected_xml =
-      "<Sen Type=\"KROSHU\"><AK/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
+      "<Sen Type=\"MAXWELL\"><AK/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
 
     EXPECT_STREQ(control_signal.CreateXMLString(0).value().data(), expected_xml);
 }
@@ -317,7 +317,7 @@ TEST_F(KSSControlSignal, TestInitialMotionStateHasSmallerDof) {
     std::vector<double> values = {3.4, 3.4, 3.4, 3.4};
     control_signal.AddJointPositionValues(values.begin(), values.end());
     const char* expected_xml =
-      "<Sen Type=\"KROSHU\"><AK A1=\"194.805650\" A2=\"194.805650\" A3=\"194.805650\" A4=\"194.805650\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
+      "<Sen Type=\"MAXWELL\"><AK A1=\"194.805650\" A2=\"194.805650\" A3=\"194.805650\" A4=\"194.805650\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
 
     EXPECT_STREQ(control_signal.CreateXMLString(0).value().data(), expected_xml);
 }
@@ -332,7 +332,7 @@ TEST_F(KSSControlSignal, TestFillEverything) {
     std::vector<double> values = {3.4, 3.4, 3.4, 3.4, 3.4, 3.4};
     control_signal.AddJointPositionValues(values.begin(), values.end());
     const char* expected_xml =
-      "<Sen Type=\"KROSHU\"><AK A1=\"193.805650\" A2=\"192.805650\" A3=\"191.805650\" A4=\"190.805650\" A5=\"189.805650\" A6=\"188.805650\"/><Stop>1</Stop><IPOC>543265442</IPOC></Sen>";
+      "<Sen Type=\"MAXWELL\"><AK A1=\"193.805650\" A2=\"192.805650\" A3=\"191.805650\" A4=\"190.805650\" A5=\"189.805650\" A6=\"188.805650\"/><Stop>1</Stop><IPOC>543265442</IPOC></Sen>";
 
     EXPECT_STREQ(control_signal.CreateXMLString(543265442, true).value().data(), expected_xml);
 }
@@ -346,7 +346,7 @@ TEST_F(KSSControlSignal, TestInitWithDifferentValues) {
     std::vector<double> values = {3.4, 3.4, 3.4, 3.4, 3.4, 3.4};
     control_signal.AddJointPositionValues(values.begin(), values.end());
     const char* expected_xml =
-      "<Sen Type=\"KROSHU\"><AK A1=\"0.000000\" A2=\"-5.729578\" A3=\"-11.459156\" A4=\"-17.188734\" A5=\"-22.918312\" A6=\"-28.647890\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
+      "<Sen Type=\"MAXWELL\"><AK A1=\"0.000000\" A2=\"-5.729578\" A3=\"-11.459156\" A4=\"-17.188734\" A5=\"-22.918312\" A6=\"-28.647890\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
 
     EXPECT_STREQ(control_signal.CreateXMLString(0, false).value().data(), expected_xml);
 }
@@ -359,7 +359,7 @@ TEST_F(KSSControlSignal, TestInitWithHighPrecision) {
     control_signal.AddJointPositionValues({183.412344666443214313, 183.512344666443214313, 183.612344666443214313, 183.712344666443214313, 183.912344666443214313, 183.112344966443214313});
 
     const char* expected_xml =
-      "<Sen Type=\"KROSHU\"><AK A1=\"183.412345\" A2=\"183.512345\" A3=\"183.612345\" A4=\"183.712345\" A5=\"183.912345\" A6=\"183.112345\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
+      "<Sen Type=\"MAXWELL\"><AK A1=\"183.412345\" A2=\"183.512345\" A3=\"183.612345\" A4=\"183.712345\" A5=\"183.912345\" A6=\"183.112345\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
 
     EXPECT_STREQ(control_signal.CreateXMLString(0, false).value().data(), expected_xml);
 }
@@ -372,7 +372,7 @@ TEST_F(KSSControlSignal, TestInitWithHugeDoubles) {
     control_signal.AddJointPositionValues({std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max()});
 
     const char* expected_xml =
-      "<Sen Type=\"KROSHU\"><AK A1=\"17976931348\" A2=\"17976931348\" A3=\"17976931348\" A4=\"17976931348\" A5=\"17976931348\" A6=\"17976931348\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
+      "<Sen Type=\"MAXWELL\"><AK A1=\"17976931348\" A2=\"17976931348\" A3=\"17976931348\" A4=\"17976931348\" A5=\"17976931348\" A6=\"17976931348\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
 
     EXPECT_STREQ(control_signal.CreateXMLString(0, false).value().data(), expected_xml);
 }
@@ -392,7 +392,7 @@ TEST_F(KSSControlSignal, AddPositionsMultipleTimes) {
     std::vector<double> values1 = {2.0, 3.2, 4.0, 5.00000};
     control_signal.AddJointPositionValues(values1.begin(), values1.end());
     const char* expected_xml =
-      "<Sen Type=\"KROSHU\"><AK A1=\"114.591559\" A2=\"183.346494\" A3=\"229.183118\" A4=\"286.478898\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
+      "<Sen Type=\"MAXWELL\"><AK A1=\"114.591559\" A2=\"183.346494\" A3=\"229.183118\" A4=\"286.478898\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
 
     EXPECT_STREQ(control_signal.CreateXMLString(0).value().data(), expected_xml);
 
@@ -400,7 +400,7 @@ TEST_F(KSSControlSignal, AddPositionsMultipleTimes) {
     control_signal.AddJointPositionValues(values2.begin(), values2.end());
 
     expected_xml =
-      "<Sen Type=\"KROSHU\"><AK A1=\"108.861981\" A2=\"177.616916\" A3=\"229.526893\" A4=\"286.478898\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
+      "<Sen Type=\"MAXWELL\"><AK A1=\"108.861981\" A2=\"177.616916\" A3=\"229.526893\" A4=\"286.478898\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
 
     // Return relative positions after the first Get
     EXPECT_STREQ(control_signal.CreateXMLString(0).value().data(), expected_xml);
@@ -409,7 +409,7 @@ TEST_F(KSSControlSignal, AddPositionsMultipleTimes) {
     std::vector<double> values3 = {1.0, 3.4, 4.0, -5.00000};
     control_signal.AddJointPositionValues(values3.begin(), values3.end());
     expected_xml =
-      "<Sen Type=\"KROSHU\"><AK A1=\"57.295780\" A2=\"194.805650\" A3=\"229.183118\" A4=\"-286.478898\"/><Stop>0</Stop><IPOC>1</IPOC></Sen>";
+      "<Sen Type=\"MAXWELL\"><AK A1=\"57.295780\" A2=\"194.805650\" A3=\"229.183118\" A4=\"-286.478898\"/><Stop>0</Stop><IPOC>1</IPOC></Sen>";
 
     EXPECT_STREQ(control_signal.CreateXMLString(1).value().data(), expected_xml);
 }
@@ -428,6 +428,6 @@ TEST_F(KSSControlSignal, TestAddPositionsTwice) {
     control_signal.AddJointPositionValues(values2.begin(), values2.end());
 
     const char* expected_xml =
-      "<Sen Type=\"KROSHU\"><AK A1=\"160.428183\" A2=\"206.264806\" A3=\"236.058612\" A4=\"303.667631\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
+      "<Sen Type=\"MAXWELL\"><AK A1=\"160.428183\" A2=\"206.264806\" A3=\"236.058612\" A4=\"303.667631\"/><Stop>0</Stop><IPOC>0</IPOC></Sen>";
     EXPECT_STREQ(control_signal.CreateXMLString(0).value().data(), expected_xml);
 }

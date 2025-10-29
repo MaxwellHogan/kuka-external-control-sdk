@@ -20,6 +20,7 @@
 #include "kuka/external-control-sdk/kss/message_builder.h"
 #include "kuka/external-control-sdk/kss/rsi/endpoint.h"
 
+
 namespace kuka::external::control::kss::rsi {
 
 class Robot : public IRobot {
@@ -64,8 +65,12 @@ class Robot : public IRobot {
 
   Endpoint endpoint_;
 
+  // loaded from file
+  std::vector<JointInfo> joint_info_;
+
   // Members and methods for implementing control
  private:
+
   Status UpdateMotionState(std::string_view xml_str);
 
  private:
