@@ -99,6 +99,9 @@ private:
 
 class ControlSignal : public BaseControlSignal {
 public:
+
+  static uint8_t file_saved; // set to 1 when first xml arrives
+  
   ControlSignal(std::size_t dof, std::vector<GPIOConfiguration> gpio_config_list, const std::vector<JointInfo>* joint_info)
       : BaseControlSignal(dof), joint_info_(joint_info) {
 

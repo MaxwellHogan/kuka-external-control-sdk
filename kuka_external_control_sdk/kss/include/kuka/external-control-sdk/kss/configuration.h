@@ -44,6 +44,10 @@ struct GPIOConfiguration {
 };
 
 struct Configuration {
+
+  // Path to the ethernet config file - used to determine joint type 
+  std::string rsi_ethernet_config_file;
+  
   // IP address of the KONI interface on the KRC-5.
   std::string kli_ip_address;
 

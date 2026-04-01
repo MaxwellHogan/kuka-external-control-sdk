@@ -1,6 +1,7 @@
 I created this fork to add support of an external axis (a linear rail), this has been tested on my setup:
 
 KR50 R2100
+
 KL 4000
 
 # KUKA External Control SDK

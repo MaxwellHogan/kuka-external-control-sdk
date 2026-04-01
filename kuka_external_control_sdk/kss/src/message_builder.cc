@@ -22,7 +22,7 @@
 #include <stdexcept>
 #include <string>
 
-#include <fstream>   // Add at the top of the file
+#include <fstream>  
 
 using namespace tinyxml2;
 
@@ -56,8 +56,8 @@ std::vector<JointInfo> LoadJointsFromRSIConfig(const std::string& filename) {
 
 namespace kuka::external::control::kss {
 
-uint8_t MotionState::file_saved = 0;
-
+uint8_t MotionState::file_saved = 0; 
+uint8_t ControlSignal::file_saved = 0; 
 
 void MotionState::CreateFromXML(const char *incoming_xml) {
     if (!incoming_xml) throw std::invalid_argument("Received XML is null");
@@ -173,6 +173,15 @@ std::optional<std::string_view> ControlSignal::CreateXMLString(int last_ipoc, bo
     doc.Print(&printer);
 
     xml_output = printer.CStr();
+
+    if (file_saved == 0){
+      std::ofstream xml_out("/mnt/nova_ssd/workspaces/isaac_ros-dev/sent_state.xml", std::ios::out | std::ios::trunc);
+      if (xml_out.is_open()) {
+          xml_out << xml_output;
+          xml_out.close();
+      }
+      file_saved = 1;
+  }
     return xml_output;
 }
 

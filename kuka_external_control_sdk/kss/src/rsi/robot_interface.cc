@@ -25,10 +25,14 @@ namespace kuka::external::control::kss::rsi {
 
 Robot::Robot(Configuration config)
     : config_(config),
-    joint_info_(LoadJointsFromRSIConfig("/mnt/nova_ssd/workspaces/isaac_ros-dev/src/kuka-external-control-sdk/kuka_external_control_sdk/krc_setup/kss/Config/User/Common/SensorInterface/rsi_ethernet.xml")),
+    // joint_info_(LoadJointsFromRSIConfig("/mnt/nova_ssd/workspaces/isaac_ros-dev/src/kuka-external-control-sdk/kuka_external_control_sdk/krc_setup/kss/Config/User/Common/SensorInterface/rsi_ethernet.xml")),
+    joint_info_(LoadJointsFromRSIConfig(config.rsi_ethernet_config_file)),
     last_motion_state_(config.dof, config.gpio_state_configs, &joint_info_),
     initial_motion_state_(config.dof, config.gpio_state_configs, &joint_info_),
-    control_signal_(config.dof, config.gpio_command_configs, &joint_info_) {}
+    control_signal_(config.dof, config.gpio_command_configs, &joint_info_) { 
+      std::cout << "Using rsi ethernet config:" << config.rsi_ethernet_config_file << std::endl;
+      std::cout << "Using dof:" << config.dof << std::endl;
+    }
 
 
 Status Robot::Setup() {
@@ -116,7 +120,6 @@ Status Robot::SendControlSignal() {
 Status
 Robot::ReceiveMotionState(std::chrono::milliseconds receive_request_timeout) {
 
-  // std::cout << "!!!!!!!!!!!! Here at line 113 robot interface !!!!!!!!!!!!";
   if (!endpoint_.ReceiveOrTimeout(receive_request_timeout)) {
     return {ReturnCode::ERROR, "Receiving RSI state failed"};
   }
